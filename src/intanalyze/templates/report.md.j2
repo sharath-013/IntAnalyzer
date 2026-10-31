@@ -1,0 +1,86 @@
+# IntAnalyze report: {{ r.package.name }}@{{ r.package.version }}
+
+| | |
+|---|---|
+| **Status** | **{{ r.status }}** (risk score {{ r.score }}/100) |
+| **Package** | `{{ r.package.name }}` |
+| **Version** | `{{ r.package.version }}` |
+| **Source** | {{ source | mdcell }} |
+| **Integrity** | {{ integrity }} |
+| **Files** | {{ r.files_in_package }} in package, {{ r.files_in_source }} in source |
+| **LLM** | {{ llm | mdcell }} |
+| **Tool** | intanalyze {{ r.tool_version }} |
+
+## Summary
+
+{{ r.summary or "No summary." }}
+
+## Findings
+
+{% if flagged %}
+| Path | Verdict | Severity | Rules | Reason |
+|---|---|---|---|---|
+{% for f in flagged %}
+| `{{ f.path | mdcell }}` | {{ f.verdict }} | {{ f.severity }} | {{ f.rule_ids | join(", ") }} | {{ f.reason | mdcell }} |
+{% endfor %}
+{% else %}
+No CHANGED or SUSPICIOUS files.
+{% endif %}
+
+## Expected differences
+
+{% for line in counts %}
+- {{ line }}
+{% else %}
+- none
+{% endfor %}
+{% if mappings %}
+
+Build output mapped to source:
+
+{% for f in mappings %}
+- `{{ f.path }}` ← `{{ f.mapped_source }}`
+{% endfor %}
+{% endif %}
+{% if flagged %}
+
+## Details
+
+{% for f in flagged %}
+### `{{ f.path }}`: {{ f.verdict }} / {{ f.severity }}
+
+{% if f.explanation %}
+{{ f.explanation.summary }}
+
+**Why it matters:** {{ f.explanation.why_it_matters }}
+
+**Recommended action:** {{ f.explanation.recommended_action }}
+
+{% endif %}
+*Explained by {{ "the LLM" if f.explanation_source == "llm" else "rule text" }}. Rules: {{ f.rule_ids | join(", ") }}.*
+
+Evidence:
+
+{% for e in f.evidence %}
+- `{{ e | replace("`", "'") }}`
+{% endfor %}
+{% if f.diff %}
+
+<details><summary>Diff (source → package)</summary>
+
+```diff
+{{ f.diff.rstrip() }}
+```
+
+</details>
+{% endif %}
+
+{% endfor %}
+{% endif %}
+{% if used_rules %}
+## Rules triggered
+
+{% for rule in used_rules %}
+- **{{ rule }}**: {{ rules[rule] }}
+{% endfor %}
+{% endif %}
