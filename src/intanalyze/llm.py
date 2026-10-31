@@ -320,3 +320,29 @@ def explain_report(
     else:
         report.llm = LLMInfo(used=True, server=client.server, model=client.answered_model)
     return report
+
+
+def explain_checked(
+    report: Report,
+    client: LMStudioClient,
+    *,
+    on_progress: Callable[[int, int], None] | None = None,
+    warn: Callable[[str], None] = lambda msg: None,
+) -> Report:
+    """``explain_report`` after a quick ``GET /models``, so a server that is down costs one
+    warning instead of a timeout per finding. Used by both the CLI and the web UI."""
+    try:
+        loaded = client.models()
+    except LLMUnavailable as exc:
+        warn(f"{exc}; using rule explanations only")
+        explain_report(report, None)
+        report.llm = LLMInfo(used=False, server=client.server, reason=str(exc))
+        return report
+    except LLMError:
+        loaded = []
+    if client.model not in loaded:
+        warn(
+            f"{client.model} is not listed as loaded on {client.server}; "
+            "LM Studio may load it on first use"
+        )
+    return explain_report(report, client, on_progress=on_progress, warn=warn)

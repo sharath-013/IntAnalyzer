@@ -105,6 +105,24 @@ intanalyze check left-pad@1.3.0 --no-llm --fail-on medium --format json --out in
 
 See [`examples/`](examples/) for real outputs: the clean fixture, the malicious fixture, and `ms@2.1.3`.
 
+### Graphical interface
+
+```bash
+intanalyze serve          # opens http://127.0.0.1:8787 in your browser
+```
+
+Type `name@version` (or click a suggestion) and press **Check package**. The page shows
+progress while it resolves, downloads, compares and explains, then the verdict, risk score,
+source commit and integrity result, the local model's summary, and every finding with its
+explanation, evidence and a coloured diff. In a source checkout, **Malicious demo** and
+**Clean demo** run the bundled fixtures with no internet. **Open HTML report**, **Download
+JSON** and **Download Markdown** give the same reports as the CLI.
+
+The UI uses only Python's standard library. It listens on `127.0.0.1` only, refuses
+requests whose `Host` is not localhost (DNS rebinding), accepts only JSON POSTs, and builds
+the page with `textContent`, so package content can never run as script. Use
+`--port` to change the port and `--no-browser` to skip opening a tab.
+
 ## How it works
 
 ```

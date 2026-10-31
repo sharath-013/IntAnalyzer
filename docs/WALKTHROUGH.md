@@ -85,6 +85,7 @@ Pydantic v2 models, so every report is validated and serialises to JSON for free
 
 ## `cli.py`: the command line (Typer)
 
+- `serve`: starts the graphical interface (next section).
 - `check`: two modes. Online (`name@version`, with optional `--repo` / `--ref`) calls
   `check_online`. Offline (`--tarball` + `--source` [+ `--registry-json`]) calls
   `check_offline`. Then it calls `_explain`, renders the report, and exits with
@@ -95,6 +96,27 @@ Pydantic v2 models, so every report is validated and serialises to JSON for free
 - `doctor`: prints the LLM server URL, whether it's reachable, the loaded models, whether the
   configured model is loaded, and the git, Python and intanalyze versions.
 - `make_llm_client` is a module-level factory, so tests can swap in a fake client.
+
+## `server.py` and `web/index.html`: the graphical interface
+
+- `intanalyze serve` starts a `ThreadingHTTPServer` (standard library, no new dependency)
+  on **127.0.0.1** and opens the browser. Routes: `GET /` (the page), `GET /api/status`
+  (versions, LLM server, loaded models, whether demo fixtures exist), `POST /api/check`
+  (`{"spec": "ms@2.1.3"}` or `{"fixture": "malicious"}`, plus `llm` and `fail_on`) → a job
+  id, `GET /api/jobs/<id>` (state, progress steps, explain progress, the report), and
+  `GET /api/jobs/<id>/report.html|json|md`.
+- Each check runs in a background thread (`run_job`) that reuses the same pipeline and
+  `llm.explain_checked` as the CLI, so the UI and the CLI always give the same verdict. The
+  page polls every 400 ms and shows the steps as they happen. Any failure ends up on the job
+  as a message, never as a crashed server.
+- **Security:** loopback only; requests whose `Host` isn't `localhost`/`127.0.0.1`/`[::1]`
+  get 403, which stops DNS-rebinding attacks from a malicious website; POST must be
+  `application/json` (a foreign page can't send that without a CORS preflight, which is
+  never answered) and at most 10 KB; demo fixtures come from a fixed allow-list; a strict
+  Content-Security-Policy; and the page builds every element with `textContent`, never
+  `innerHTML`, because paths, evidence and diffs come from untrusted packages (a test checks
+  the page never uses `innerHTML`).
+- **Offline:** no CDN or web fonts, so the fixture demo works with no internet.
 
 ## `pipeline.py`: orchestration
 

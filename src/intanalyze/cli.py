@@ -13,7 +13,13 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 from rich.table import Table
 
 from intanalyze import __version__
-from intanalyze.llm import LLMError, LLMUnavailable, LMStudioClient, explain_report, llm_model
+from intanalyze.llm import (
+    LLMError,
+    LMStudioClient,
+    explain_checked,
+    explain_report,
+    llm_model,
+)
 from intanalyze.models import PackageSpec, Report, Verdict
 from intanalyze.pipeline import CheckError, check_offline, check_online
 from intanalyze.report import render, render_terminal
@@ -61,20 +67,6 @@ def _explain(report: Report, *, no_llm: bool, model: str | None) -> None:
         return
     client = make_llm_client(model=model)
     try:
-        try:
-            loaded = client.models()
-        except LLMUnavailable as exc:
-            err.print(f"[yellow]warning:[/] {exc}; using rule explanations only")
-            explain_report(report, None)
-            report.llm.server, report.llm.reason = client.server, str(exc)
-            return
-        except LLMError:
-            loaded = []
-        if client.model not in loaded:
-            err.print(
-                f"[yellow]note:[/] {client.model} is not listed as loaded on {client.server}; "
-                "LM Studio may load it on first use"
-            )
         todo = sum(1 for f in report.findings if f.verdict is not Verdict.EXPECTED)
         with Progress(
             TextColumn("explaining findings with {task.fields[model]}"),
@@ -84,7 +76,7 @@ def _explain(report: Report, *, no_llm: bool, model: str | None) -> None:
             transient=True,
         ) as bar:
             task = bar.add_task("explain", total=min(todo, 25), model=client.model)
-            explain_report(
+            explain_checked(
                 report,
                 client,
                 on_progress=lambda done, total: bar.update(task, completed=done),
@@ -131,6 +123,21 @@ def doctor() -> None:
         if close:
             close()
     out.print(table)
+
+
+@app.command()
+def serve(
+    port: int = typer.Option(8787, "--port", help="Port on 127.0.0.1 to serve the UI on."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Don't open a browser tab."),
+) -> None:
+    """Open the graphical interface in your browser (local only, http://127.0.0.1:8787)."""
+    from intanalyze.server import serve as run_server
+
+    try:
+        run_server(port=port, open_browser=not no_browser)
+    except OSError as exc:
+        err.print(f"[red]error:[/] could not start the UI on port {port}: {exc}")
+        raise typer.Exit(EXIT_ERROR) from None
 
 
 @app.command()
