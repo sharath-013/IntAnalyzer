@@ -75,8 +75,12 @@ class FileDiff(BaseModel):
     source_sha256: str | None = None
     size: int = 0
     is_binary: bool = False
+    # Over the per-file analysis limit: hashed, but not scanned or diffed.
+    too_large: bool = False
     diff: str | None = None
     diff_truncated: bool = False
+    lines_added: int = 0
+    lines_removed: int = 0
 
 
 class Explanation(BaseModel):
@@ -94,6 +98,7 @@ class Finding(BaseModel):
     reason: str
     evidence: list[str] = Field(default_factory=list)
     mapped_source: str | None = None
+    diff: str | None = None
     explanation: Explanation | None = None
     explanation_source: Literal["llm", "rules"] = "rules"
 
