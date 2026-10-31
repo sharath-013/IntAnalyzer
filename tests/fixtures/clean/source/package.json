@@ -1,0 +1,22 @@
+{
+  "name": "tiny-percent",
+  "version": "1.0.0",
+  "description": "Percent helpers (IntAnalyze test fixture)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intanalyze-fixtures/tiny-percent.git"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
