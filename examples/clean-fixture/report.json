@@ -1,0 +1,135 @@
+{
+  "tool_version": "0.1.0",
+  "package": {
+    "name": "tiny-percent",
+    "version": "1.0.0"
+  },
+  "tarball_url": "https://registry.npmjs.org/tiny-percent/-/tiny-percent-1.0.0.tgz",
+  "source": {
+    "repo_url": "https://github.com/intanalyze-fixtures/tiny-percent",
+    "ref": "tests/fixtures/clean/source",
+    "ref_kind": "local",
+    "directory": null
+  },
+  "integrity": {
+    "checked": true,
+    "algorithm": "sha512",
+    "expected": "sha512-NiJulKBdt84bGVB5E5blbIZ2Z04cQH9nMsbNTiLlodwGpFsHKd4wvunZR1f52mInRa/HXaSJqdmAZLdLzxz6ow==",
+    "actual": "sha512-NiJulKBdt84bGVB5E5blbIZ2Z04cQH9nMsbNTiLlodwGpFsHKd4wvunZR1f52mInRa/HXaSJqdmAZLdLzxz6ow==",
+    "ok": true
+  },
+  "findings": [
+    {
+      "path": "dist/index.d.ts",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/index.ts",
+      "evidence": [
+        "maps to source src/index.ts"
+      ],
+      "mapped_source": "src/index.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/index.ts",
+        "why_it_matters": "compiled output of src/index.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    },
+    {
+      "path": "dist/index.js",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/index.ts",
+      "evidence": [
+        "maps to source src/index.ts"
+      ],
+      "mapped_source": "src/index.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/index.ts",
+        "why_it_matters": "compiled output of src/index.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    },
+    {
+      "path": "dist/util.d.ts",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/util.ts",
+      "evidence": [
+        "maps to source src/util.ts"
+      ],
+      "mapped_source": "src/util.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/util.ts",
+        "why_it_matters": "compiled output of src/util.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    },
+    {
+      "path": "dist/util.js",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/util.ts",
+      "evidence": [
+        "maps to source src/util.ts"
+      ],
+      "mapped_source": "src/util.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/util.ts",
+        "why_it_matters": "compiled output of src/util.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    },
+    {
+      "path": "package.json",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "IDENTICAL",
+      "rule_ids": [],
+      "reason": "package.json matches the source (ignoring version/gitHead/_ fields)",
+      "evidence": [
+        "no meaningful manifest differences"
+      ],
+      "mapped_source": null,
+      "diff": null,
+      "explanation": {
+        "summary": "package.json matches the source (ignoring version/gitHead/_ fields)",
+        "why_it_matters": "package.json matches the source (ignoring version/gitHead/_ fields)",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    }
+  ],
+  "expected_counts": {
+    "build_output": 4,
+    "identical": 2,
+    "manifest": 1,
+    "only_in_source": 4
+  },
+  "files_in_package": 7,
+  "files_in_source": 7,
+  "score": 0,
+  "status": "CLEAN",
+  "llm": {
+    "used": true,
+    "server": "http://localhost:1235/v1",
+    "model": "qwen/qwen3.5-9b",
+    "reason": null
+  },
+  "summary": "The tiny-percent@1.0.0 release is safe to install with a final status of CLEAN and a risk score of 0/100. The integrity check passed, and while there are expected differences in build output and source files, no security issues were detected."
+}

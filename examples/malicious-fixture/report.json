@@ -1,0 +1,168 @@
+{
+  "tool_version": "0.1.0",
+  "package": {
+    "name": "tiny-percent",
+    "version": "1.0.0"
+  },
+  "tarball_url": "https://registry.npmjs.org/tiny-percent/-/tiny-percent-1.0.0.tgz",
+  "source": {
+    "repo_url": "https://github.com/intanalyze-fixtures/tiny-percent",
+    "ref": "tests/fixtures/malicious/source",
+    "ref_kind": "local",
+    "directory": null
+  },
+  "integrity": {
+    "checked": true,
+    "algorithm": "sha512",
+    "expected": "sha512-PqOdkPppKHqLd7LGDsd8mtmmZxyvBIEI5S/l+rEwXS9zDVU0XKuYAXyU/3pXQ7E8T/fOsOqJsBEluIDkgp4cQg==",
+    "actual": "sha512-PqOdkPppKHqLd7LGDsd8mtmmZxyvBIEI5S/l+rEwXS9zDVU0XKuYAXyU/3pXQ7E8T/fOsOqJsBEluIDkgp4cQg==",
+    "ok": true
+  },
+  "findings": [
+    {
+      "path": "dist/index.js",
+      "verdict": "SUSPICIOUS",
+      "severity": "HIGH",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [
+        "IA-CODE-001"
+      ],
+      "reason": "build output of src/index.ts contains code its source does not",
+      "evidence": [
+        "maps to source src/index.ts",
+        "line 12: eval() call: `eval(`"
+      ],
+      "mapped_source": "src/index.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "The published package includes an eval() call that does not exist in the source code, indicating potential code injection or obfuscation.",
+        "why_it_matters": "This difference is high risk because eval() can execute arbitrary code from strings, potentially allowing attackers to run malicious payloads if the string is manipulated.",
+        "recommended_action": "Do not publish this package until the eval() call is removed or justified with a secure alternative like Function constructor with strict validation."
+      },
+      "explanation_source": "llm"
+    },
+    {
+      "path": "lib/x.min.js",
+      "verdict": "SUSPICIOUS",
+      "severity": "HIGH",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [
+        "IA-CODE-001"
+      ],
+      "reason": "file found nowhere in the repo, with obfuscation or dangerous APIs",
+      "evidence": [
+        "high Shannon entropy 5.40 bits/char",
+        "line 2: 1273-character line",
+        "line 2: 256-char hex blob",
+        "118 \\x.. string escapes",
+        "line 2: child_process module: `child_process`",
+        "line 2: network request to a raw IP address: `http://203.0.113.7`",
+        "line 2: curl/wget/powershell command in a string: `\"curl`"
+      ],
+      "mapped_source": null,
+      "diff": null,
+      "explanation": {
+        "summary": "This file exists only in the published package, not in the source repository, and contains obfuscated code with dangerous network activity.",
+        "why_it_matters": "The high entropy and hex blob suggest obfuscation, while the raw IP address and curl command indicate potential data exfiltration or remote code execution.",
+        "recommended_action": "Do not install this package until the maintainer can explain the necessity of the file and remove the suspicious code."
+      },
+      "explanation_source": "llm"
+    },
+    {
+      "path": "package.json",
+      "verdict": "SUSPICIOUS",
+      "severity": "HIGH",
+      "relationship": "MODIFIED",
+      "rule_ids": [
+        "IA-MANIFEST-001",
+        "IA-MANIFEST-003"
+      ],
+      "reason": "package.json: install-time script not in the source, typosquat-like new dependency",
+      "evidence": [
+        "scripts.postinstall = \"node lib/x.min.js\" is not in the source package.json",
+        "new dependencies.lodahs (\"^4.17.21\") looks like a typosquat of \"lodash\""
+      ],
+      "mapped_source": null,
+      "diff": "--- source/package.json\n+++ package/package.json\n@@ -10,5 +10,6 @@\n   \"scripts\": {\n     \"build\": \"tsc\",\n-    \"test\": \"node --test\"\n+    \"test\": \"node --test\",\n+    \"postinstall\": \"node lib/x.min.js\"\n   },\n   \"repository\": {\n@@ -19,4 +20,7 @@\n   \"devDependencies\": {\n     \"typescript\": \"^5.4.0\"\n+  },\n+  \"dependencies\": {\n+    \"lodahs\": \"^4.17.21\"\n   }\n }\n",
+      "explanation": {
+        "summary": "The published package adds a postinstall script that runs a custom JavaScript file and introduces a new dependency named 'lodahs', which is a typo-squat of the legitimate 'lodash' package.",
+        "why_it_matters": "The postinstall script can execute arbitrary code during installation, potentially allowing attackers to steal credentials or install malware, while the typosquat dependency may silently inject malicious code or backdoors into your application.",
+        "recommended_action": "Do not install this package; report it to the npm registry and the maintainers for investigation and removal."
+      },
+      "explanation_source": "llm"
+    },
+    {
+      "path": "dist/index.d.ts",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/index.ts",
+      "evidence": [
+        "maps to source src/index.ts"
+      ],
+      "mapped_source": "src/index.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/index.ts",
+        "why_it_matters": "compiled output of src/index.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    },
+    {
+      "path": "dist/util.d.ts",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/util.ts",
+      "evidence": [
+        "maps to source src/util.ts"
+      ],
+      "mapped_source": "src/util.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/util.ts",
+        "why_it_matters": "compiled output of src/util.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    },
+    {
+      "path": "dist/util.js",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "ONLY_IN_PACKAGE",
+      "rule_ids": [],
+      "reason": "compiled output of src/util.ts",
+      "evidence": [
+        "maps to source src/util.ts"
+      ],
+      "mapped_source": "src/util.ts",
+      "diff": null,
+      "explanation": {
+        "summary": "compiled output of src/util.ts",
+        "why_it_matters": "compiled output of src/util.ts",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    }
+  ],
+  "expected_counts": {
+    "build_output": 3,
+    "identical": 2,
+    "only_in_source": 4
+  },
+  "files_in_package": 8,
+  "files_in_source": 7,
+  "score": 100,
+  "status": "DANGEROUS",
+  "llm": {
+    "used": true,
+    "server": "http://localhost:1235/v1",
+    "model": "qwen/qwen3.5-9b",
+    "reason": null
+  },
+  "summary": "Do not install tiny-percent@1.0.0 as it is flagged as DANGEROUS with a risk score of 100/100. The package contains suspicious build output, an obfuscated file not present in the source, and a package.json with install-time scripts and suspicious dependencies not found in the repository."
+}

@@ -1,0 +1,58 @@
+{
+  "tool_version": "0.1.0",
+  "package": {
+    "name": "ms",
+    "version": "2.1.3"
+  },
+  "tarball_url": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+  "source": {
+    "repo_url": "https://github.com/vercel/ms",
+    "ref": "1c6264b795492e8fdecbc82cb8802fcfbfc08d26",
+    "ref_kind": "gitHead",
+    "directory": null
+  },
+  "integrity": {
+    "checked": true,
+    "algorithm": "sha512",
+    "expected": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+    "actual": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+    "ok": true
+  },
+  "findings": [
+    {
+      "path": "package.json",
+      "verdict": "EXPECTED",
+      "severity": "INFO",
+      "relationship": "IDENTICAL",
+      "rule_ids": [],
+      "reason": "package.json matches the source (ignoring version/gitHead/_ fields)",
+      "evidence": [
+        "no meaningful manifest differences"
+      ],
+      "mapped_source": null,
+      "diff": null,
+      "explanation": {
+        "summary": "package.json matches the source (ignoring version/gitHead/_ fields)",
+        "why_it_matters": "package.json matches the source (ignoring version/gitHead/_ fields)",
+        "recommended_action": "No action needed."
+      },
+      "explanation_source": "rules"
+    }
+  ],
+  "expected_counts": {
+    "identical": 3,
+    "manifest": 1,
+    "only_in_source": 5
+  },
+  "files_in_package": 4,
+  "files_in_source": 9,
+  "score": 0,
+  "status": "CLEAN",
+  "llm": {
+    "used": true,
+    "server": "http://localhost:1235/v1",
+    "model": "qwen/qwen3.5-9b",
+    "reason": null
+  },
+  "summary": "The ms@2.1.3 release is verified as CLEAN with a risk score of 0/100, indicating no security issues. The integrity check passed, and the source is confirmed from the official GitHub repository. While there are expected differences in the manifest and source files, these do not affect the security status. You can safely install this release."
+}

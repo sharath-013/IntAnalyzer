@@ -1,0 +1,5 @@
+# Commands that produced the files in this folder (run from the repo root):
+export INTANALYZE_LLM_URL=http://localhost:1235/v1
+COLUMNS=100 intanalyze check --tarball tests/fixtures/clean/package.tgz --source tests/fixtures/clean/source --registry-json tests/fixtures/clean/registry.json --format terminal > examples/clean-fixture/terminal.txt
+intanalyze check --tarball tests/fixtures/clean/package.tgz --source tests/fixtures/clean/source --registry-json tests/fixtures/clean/registry.json --format md --out examples/clean-fixture/report.md
+intanalyze check --tarball tests/fixtures/clean/package.tgz --source tests/fixtures/clean/source --registry-json tests/fixtures/clean/registry.json --format json --out examples/clean-fixture/report.json

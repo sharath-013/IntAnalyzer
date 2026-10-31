@@ -1,0 +1,26 @@
+# IntAnalyze report: ms@2.1.3
+
+| | |
+|---|---|
+| **Status** | **CLEAN** (risk score 0/100) |
+| **Package** | `ms` |
+| **Version** | `2.1.3` |
+| **Source** | https://github.com/vercel/ms @ 1c6264b795492e8fdecbc82cb8802fcfbfc08d26 (gitHead) |
+| **Integrity** | sha512 OK |
+| **Files** | 4 in package, 9 in source |
+| **LLM** | yes: qwen/qwen3.5-9b via http://localhost:1235/v1 |
+| **Tool** | intanalyze 0.1.0 |
+
+## Summary
+
+The ms@2.1.3 release is verified as CLEAN with a risk score of 0/100, indicating no security issues. The integrity check passed, and the source is confirmed from the official GitHub repository. While there are expected differences in the manifest and source files, these do not affect the security status. You can safely install this release.
+
+## Findings
+
+No CHANGED or SUSPICIOUS files.
+
+## Expected differences
+
+- 3 identical to the source
+- 1 package.json matching the source
+- 5 only in the source (tests, configs, not published)
