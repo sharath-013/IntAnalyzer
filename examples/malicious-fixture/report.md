@@ -1,0 +1,119 @@
+# IntAnalyze report: tiny-percent@1.0.0
+
+| | |
+|---|---|
+| **Status** | **DANGEROUS** (risk score 100/100) |
+| **Package** | `tiny-percent` |
+| **Version** | `1.0.0` |
+| **Source** | https://github.com/intanalyze-fixtures/tiny-percent @ tests/fixtures/malicious/source (local) |
+| **Integrity** | sha512 OK |
+| **Files** | 8 in package, 7 in source |
+| **LLM** | yes: qwen/qwen3.5-9b via http://localhost:1235/v1 |
+| **Tool** | intanalyze 0.1.0 |
+
+## Summary
+
+Do not install tiny-percent@1.0.0 as it is flagged as DANGEROUS with a risk score of 100/100. The package contains suspicious build output, an obfuscated file not present in the source, and a package.json with install-time scripts and suspicious dependencies not found in the repository.
+
+## Findings
+
+| Path | Verdict | Severity | Rules | Reason |
+|---|---|---|---|---|
+| `dist/index.js` | SUSPICIOUS | HIGH | IA-CODE-001 | build output of src/index.ts contains code its source does not |
+| `lib/x.min.js` | SUSPICIOUS | HIGH | IA-CODE-001 | file found nowhere in the repo, with obfuscation or dangerous APIs |
+| `package.json` | SUSPICIOUS | HIGH | IA-MANIFEST-001, IA-MANIFEST-003 | package.json: install-time script not in the source, typosquat-like new dependency |
+
+## Expected differences
+
+- 3 build output mapped to a source file
+- 2 identical to the source
+- 4 only in the source (tests, configs, not published)
+
+Build output mapped to source:
+
+- `dist/index.d.ts` ← `src/index.ts`
+- `dist/util.d.ts` ← `src/util.ts`
+- `dist/util.js` ← `src/util.ts`
+
+## Details
+
+### `dist/index.js`: SUSPICIOUS / HIGH
+
+The published package includes an eval() call that does not exist in the source code, indicating potential code injection or obfuscation.
+
+**Why it matters:** This difference is high risk because eval() can execute arbitrary code from strings, potentially allowing attackers to run malicious payloads if the string is manipulated.
+
+**Recommended action:** Do not publish this package until the eval() call is removed or justified with a secure alternative like Function constructor with strict validation.
+
+*Explained by the LLM. Rules: IA-CODE-001.*
+
+Evidence:
+
+- `maps to source src/index.ts`
+- `line 12: eval() call: 'eval('`
+
+### `lib/x.min.js`: SUSPICIOUS / HIGH
+
+This file exists only in the published package, not in the source repository, and contains obfuscated code with dangerous network activity.
+
+**Why it matters:** The high entropy and hex blob suggest obfuscation, while the raw IP address and curl command indicate potential data exfiltration or remote code execution.
+
+**Recommended action:** Do not install this package until the maintainer can explain the necessity of the file and remove the suspicious code.
+
+*Explained by the LLM. Rules: IA-CODE-001.*
+
+Evidence:
+
+- `high Shannon entropy 5.40 bits/char`
+- `line 2: 1273-character line`
+- `line 2: 256-char hex blob`
+- `118 \x.. string escapes`
+- `line 2: child_process module: 'child_process'`
+- `line 2: network request to a raw IP address: 'http://203.0.113.7'`
+- `line 2: curl/wget/powershell command in a string: '"curl'`
+
+### `package.json`: SUSPICIOUS / HIGH
+
+The published package adds a postinstall script that runs a custom JavaScript file and introduces a new dependency named 'lodahs', which is a typo-squat of the legitimate 'lodash' package.
+
+**Why it matters:** The postinstall script can execute arbitrary code during installation, potentially allowing attackers to steal credentials or install malware, while the typosquat dependency may silently inject malicious code or backdoors into your application.
+
+**Recommended action:** Do not install this package; report it to the npm registry and the maintainers for investigation and removal.
+
+*Explained by the LLM. Rules: IA-MANIFEST-001, IA-MANIFEST-003.*
+
+Evidence:
+
+- `scripts.postinstall = "node lib/x.min.js" is not in the source package.json`
+- `new dependencies.lodahs ("^4.17.21") looks like a typosquat of "lodash"`
+
+<details><summary>Diff (source → package)</summary>
+
+```diff
+--- source/package.json
++++ package/package.json
+@@ -10,5 +10,6 @@
+   "scripts": {
+     "build": "tsc",
+-    "test": "node --test"
++    "test": "node --test",
++    "postinstall": "node lib/x.min.js"
+   },
+   "repository": {
+@@ -19,4 +20,7 @@
+   "devDependencies": {
+     "typescript": "^5.4.0"
++  },
++  "dependencies": {
++    "lodahs": "^4.17.21"
+   }
+ }
+```
+
+</details>
+
+## Rules triggered
+
+- **IA-CODE-001**: File without a source counterpart (or build output) contains obfuscation or dangerous APIs that its source does not.
+- **IA-MANIFEST-001**: Install-time lifecycle script (preinstall/install/postinstall, or a package-only prepare) added or changed versus the source package.json.
+- **IA-MANIFEST-003**: New dependency whose name is 1-2 edits away from a well-known package or an existing dependency (possible typosquat).

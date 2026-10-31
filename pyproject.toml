@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "intanalyze"
 dynamic = ["version"]
 description = "Checks whether a published npm package matches its source repository."
+readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]

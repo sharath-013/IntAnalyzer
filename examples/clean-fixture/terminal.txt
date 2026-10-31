@@ -1,0 +1,22 @@
+╭─────────────────────────────────────────── IntAnalyze ───────────────────────────────────────────╮
+│ Package    tiny-percent                                                                          │
+│ Version    1.0.0                                                                                 │
+│ Source     https://github.com/intanalyze-fixtures/tiny-percent @ tests/fixtures/clean/source     │
+│            (local)                                                                               │
+│ Integrity  sha512 OK                                                                             │
+│ Status     CLEAN  (risk score 0/100)                                                             │
+│ Files      7 in package, 7 in source                                                             │
+│ LLM        yes: qwen/qwen3.5-9b via http://localhost:1235/v1                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+No CHANGED or SUSPICIOUS files.
+Expected differences (collapsed): 4 build output mapped to a source file; 2 identical to the source;
+1 package.json matching the source; 4 only in the source (tests, configs, not published)
+  dist/index.d.ts <- src/index.ts
+  dist/index.js <- src/index.ts
+  dist/util.d.ts <- src/util.ts
+  dist/util.js <- src/util.ts
+╭───────────────────────────────────────── Summary (LLM) ──────────────────────────────────────────╮
+│ The tiny-percent@1.0.0 release is safe to install with a final status of CLEAN and a risk score  │
+│ of 0/100. The integrity check passed, and while there are expected differences in build output   │
+│ and source files, no security issues were detected.                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

@@ -1,0 +1,5 @@
+# Commands that produced the files in this folder (run from the repo root):
+export INTANALYZE_LLM_URL=http://localhost:1235/v1
+COLUMNS=100 intanalyze check --tarball tests/fixtures/malicious/package.tgz --source tests/fixtures/malicious/source --registry-json tests/fixtures/malicious/registry.json --format terminal > examples/malicious-fixture/terminal.txt
+intanalyze check --tarball tests/fixtures/malicious/package.tgz --source tests/fixtures/malicious/source --registry-json tests/fixtures/malicious/registry.json --format md --out examples/malicious-fixture/report.md
+intanalyze check --tarball tests/fixtures/malicious/package.tgz --source tests/fixtures/malicious/source --registry-json tests/fixtures/malicious/registry.json --format json --out examples/malicious-fixture/report.json
