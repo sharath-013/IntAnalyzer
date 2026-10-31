@@ -101,3 +101,20 @@ def test_new_dangerous_signals_counts_per_api():
     assert _names(new_dangerous_signals("eval(a)\neval(b)", "eval(a)")) == {"eval"}
     assert new_dangerous_signals("eval(a)", "eval(a)") == []
     assert _names(new_dangerous_signals("eval(a)", None)) == {"eval"}
+
+
+def test_non_english_text_is_not_high_entropy():
+    months = ["январь", "февраль", "март", "апрель", "կիրակի", "月曜日"] * 60
+    text = "const months = " + repr(months)
+    assert "entropy" not in _names(obfuscation_signals(text))
+
+
+def test_escaped_accented_letters_are_not_obfuscation():
+    text = "var m = '" + "\\u00e1\\u00e9\\u00ed\\u00f3\\u00fa" * 40 + "';\n"
+    assert "hex-escapes" not in _names(obfuscation_signals(text))
+
+
+def test_every_dangerous_pattern_has_keywords():
+    from intanalyze.rules.obfuscation import _DANGEROUS, _KEYWORDS
+
+    assert set(_KEYWORDS) == set(_DANGEROUS)

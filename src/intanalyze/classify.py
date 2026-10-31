@@ -42,6 +42,8 @@ def _loose(text: str | None) -> str | None:
 
 
 def _load_json(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
     text = read_text(path)
     if text is None:
         return None
@@ -106,8 +108,28 @@ def _doc_matches_source(fd: FileDiff, pkg: Path, src: Path, src_files: set[str])
     return None
 
 
+# Fields a nested "subpath" package.json (e.g. rxjs/ajax/package.json) uses to redirect
+# imports. npm only runs lifecycle scripts from the root package.json.
+_STUB_FIELDS = frozenset(
+    {"name", "version", "private", "main", "module", "types", "typings", "browser",
+     "exports", "type", "sideEffects", "es2015", "esm5", "esm2015", "fesm2015", "fesm5"}
+)
+
+
+def _is_subpath_stub(fd: FileDiff, pkg: Path) -> bool:
+    if not fd.path.endswith("/package.json"):
+        return False
+    data = _load_json(pkg / fd.path)
+    return bool(data) and set(data) <= _STUB_FIELDS
+
+
 def _classify_package_only(
-    fd: FileDiff, pkg: Path, src: Path, src_files: set[str], counts: Counter[str]
+    fd: FileDiff,
+    pkg: Path,
+    src: Path,
+    src_files: set[str],
+    counts: Counter[str],
+    package_name: str | None = None,
 ) -> tuple[Finding | None, bool]:
     """Returns (finding, is_unexplained)."""
     if fd.too_large:
@@ -132,7 +154,18 @@ def _classify_package_only(
             False,
         )
 
-    mapped = map_to_source(fd.path, src_files)
+    if _is_subpath_stub(fd, pkg):
+        counts["subpath_stub"] += 1
+        return (
+            _finding(
+                fd, Verdict.EXPECTED, Severity.INFO, [],
+                "subpath package.json that only points imports at published files",
+                ["nested package.json with resolution fields only (npm never runs its scripts)"],
+            ),
+            False,
+        )
+
+    mapped = map_to_source(fd.path, src_files, package_name)
     text = None if fd.is_binary else read_text(pkg / fd.path)
 
     if mapped:
@@ -192,7 +225,12 @@ def _classify_package_only(
 
 
 def _classify_modified(
-    fd: FileDiff, pkg: Path, src: Path, src_files: set[str], counts: Counter[str]
+    fd: FileDiff,
+    pkg: Path,
+    src: Path,
+    src_files: set[str],
+    counts: Counter[str],
+    package_name: str | None = None,
 ) -> Finding:
     if fd.is_binary or fd.too_large:
         why = "binary" if fd.is_binary else "over the 20 MB analysis limit"
@@ -213,7 +251,7 @@ def _classify_modified(
         )
 
     added = new_dangerous_signals(pkg_text, src_text)
-    mapped = map_to_source(fd.path, src_files)
+    mapped = map_to_source(fd.path, src_files, package_name)
     if mapped and is_code(fd.path):
         # Committed build output that was rebuilt: judge it against the real source too.
         added = [s for s in added if s in new_dangerous_signals(pkg_text, read_text(src / mapped))]
@@ -285,6 +323,10 @@ def classify(
     unexplained: set[str] = set()
     manifest_fd: FileDiff | None = None
 
+    pkg_manifest = _load_json(pkg / "package.json") or {}
+    name = pkg_manifest.get("name")
+    package_name = name if isinstance(name, str) else None
+
     for fd in diffs:
         if fd.path == "package.json" and fd.relationship is not Relationship.ONLY_IN_SOURCE:
             manifest_fd = fd
@@ -294,16 +336,17 @@ def classify(
         elif fd.relationship is Relationship.ONLY_IN_SOURCE:
             counts["only_in_source"] += 1
         elif fd.relationship is Relationship.ONLY_IN_PACKAGE:
-            finding, is_unexplained = _classify_package_only(fd, pkg, src, src_files, counts)
+            finding, is_unexplained = _classify_package_only(
+                fd, pkg, src, src_files, counts, package_name
+            )
             if is_unexplained:
                 unexplained.add(fd.path)
             if finding:
                 findings.append(finding)
         else:
-            findings.append(_classify_modified(fd, pkg, src, src_files, counts))
+            findings.append(_classify_modified(fd, pkg, src, src_files, counts, package_name))
 
     if manifest_fd is not None:
-        pkg_manifest = _load_json(pkg / "package.json") or {}
         src_manifest = (
             _load_json(src / "package.json")
             if manifest_fd.relationship is not Relationship.ONLY_IN_PACKAGE

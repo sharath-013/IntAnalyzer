@@ -91,10 +91,38 @@ def shannon_entropy(text: str) -> float:
     return -sum(c / n * math.log2(c / n) for c in counts.values())
 
 
+# Every dangerous pattern needs one of these literal substrings to match, so a cheap
+# ``in`` check decides which regexes are worth running at all (most files need none).
+# Keywords for case-insensitive patterns are lower-case and checked against lowered text.
+_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "eval": ("eval",),
+    "new-function": ("Function",),
+    "child_process": ("child_process",),
+    "exec": ("exec",),
+    "spawn": ("spawn",),
+    "raw-socket": ("net", "dgram", "dns"),
+    "raw-ip-request": ("http", "fetch", "request", "connect", "get"),
+    "env-harvest": ("process.env",),
+    "credential-files": (".npmrc", ".ssh", ".aws", "id_rsa", ".git-credentials"),
+    "shell-download": ("curl", "wget", "powershell", "invoke-webrequest", "iwr"),
+}
+
+
 def dangerous_signals(text: str) -> list[Signal]:
-    out = []
+    out: list[Signal] = []
+    lowered = text.lower()
+    active = {
+        name: entry
+        for name, entry in _DANGEROUS.items()
+        if any(
+            kw in (lowered if entry[0].flags & re.IGNORECASE else text)
+            for kw in _KEYWORDS[name]
+        )
+    }
+    if not active:
+        return out
     for lineno, line in enumerate(text.splitlines(), start=1):
-        for name, (pattern, desc) in _DANGEROUS.items():
+        for name, (pattern, desc) in active.items():
             if m := pattern.search(line):
                 snippet = m.group(0)[:60]
                 out.append(Signal("dangerous", name, lineno, f"{desc}: `{snippet}`"))
@@ -112,8 +140,11 @@ def obfuscation_signals(text: str, *, path: str = "", minified_ok: bool = False)
     data_file = path.endswith((".json", ".map"))
     lines = text.splitlines()
 
-    if not minified_ok and not data_file and len(text) >= ENTROPY_MIN_CHARS:
-        ent = shannon_entropy(text)
+    # Entropy over ASCII only: packed payloads (base64, hex, escapes) are ASCII, while
+    # legitimate non-English text (e.g. locale files) has high per-character entropy.
+    ascii_text = text.encode("ascii", "ignore").decode()
+    if not minified_ok and not data_file and len(ascii_text) >= ENTROPY_MIN_CHARS:
+        ent = shannon_entropy(ascii_text)
         if ent > ENTROPY_THRESHOLD:
             out.append(
                 Signal("obfuscation", "entropy", None, f"high Shannon entropy {ent:.2f} bits/char")
@@ -146,7 +177,9 @@ def obfuscation_signals(text: str, *, path: str = "", minified_ok: bool = False)
                 )
                 break
 
-    escapes = _HEX_ESCAPE.findall(text)
+    # Only escapes that hide printable ASCII count: "\x63\x68" spells "ch" for no reason other
+    # than hiding it, while bundlers legitimately write accented letters as "\u00e1".
+    escapes = [e for e in _HEX_ESCAPE.findall(text) if 0x20 <= int(e[-2:], 16) <= 0x7E]
     density = len(escapes) * 4 / max(len(text), 1)
     if len(escapes) >= HEX_ESCAPE_MIN and density >= HEX_ESCAPE_DENSITY:
         out.append(
