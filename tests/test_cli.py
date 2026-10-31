@@ -91,3 +91,57 @@ def test_online_resolve_failure_exits_2(monkeypatch):
     result = runner.invoke(app, ["check", "ms@2.1.3", "--no-llm"])
     assert result.exit_code == 2
     assert "no source repository declared" in result.output
+
+
+def test_doctor_with_server_down(monkeypatch):
+    monkeypatch.setenv("INTANALYZE_LLM_URL", "http://127.0.0.1:9/v1")
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "127.0.0.1:9" in result.output and "no" in result.output
+    assert "git version" in result.output
+
+
+def test_doctor_with_server_up(monkeypatch):
+    class Up:
+        server, model = "http://fake/v1", "qwen/qwen3.5-9b"
+
+        def models(self):
+            return ["qwen/qwen3.5-9b"]
+
+    monkeypatch.setattr(cli, "make_llm_client", lambda **kw: Up())
+    result = runner.invoke(app, ["doctor"])
+    assert "yes" in result.output and "qwen/qwen3.5-9b" in result.output
+
+
+def test_check_without_server_falls_back(monkeypatch, tmp_path):
+    monkeypatch.setenv("INTANALYZE_LLM_URL", "http://127.0.0.1:9/v1")
+    out = tmp_path / "r.json"
+    args = [a for a in _offline_args("malicious", "--format", "json", "--out", str(out))
+            if a != "--no-llm"]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 1
+    report = json.loads(out.read_text())
+    assert report["llm"]["used"] is False and "not reachable" in report["llm"]["reason"]
+
+
+def test_check_with_fake_llm(monkeypatch, tmp_path):
+    from intanalyze.llm import FakeLLM
+
+    class Fake(FakeLLM):
+        model = "fake-llm"
+
+        def __init__(self, **kw):
+            super().__init__()
+
+        def models(self):
+            return ["fake-llm"]
+
+    monkeypatch.setattr(cli, "make_llm_client", Fake)
+    out = tmp_path / "r.json"
+    args = [a for a in _offline_args("malicious", "--format", "json", "--out", str(out))
+            if a != "--no-llm"]
+    assert runner.invoke(app, args).exit_code == 1
+    report = json.loads(out.read_text())
+    assert report["llm"] == {"used": True, "server": "fake://llm", "model": "fake-llm",
+                             "reason": None}
+    assert report["summary"].startswith("[fake]")
