@@ -187,11 +187,25 @@ any of these, and a refusal is a strong signal in itself.
 
 ## `rules/build_mapping.py`: is this file just compiled output?
 
-`map_to_source("dist/esm/util/strings.js", source_files)` returns `src/util/strings.tsx`. It
-finds an output dir (`dist|lib|build|esm|cjs|out`, optionally nested like `dist/cjs/`), strips
-an output extension (`.js .mjs .cjs .d.ts .d.mts .d.cts .js.map .d.ts.map`, longest first),
-and tries `src/<stem>.<ts|tsx|js|jsx|mjs|cjs|mts|cts>` and `<stem>.<ext>`, keeping any
-monorepo prefix.
+`map_to_source("dist/esm5/util/strings.js", source_files, package_name)` returns
+`src/util/strings.tsx`. It finds an output dir
+(`dist|lib|build|esm|cjs|out|umd|es|bundles|types|typings`), allows up to two build-flavour
+folders under it (`esm5/`, `types/`, `cjs/`, …), strips an output extension
+(`.js .mjs .cjs .d.ts .d.mts .d.cts .js.map .d.ts.map`, longest first), and tries
+`src/<stem>.<ext>`, `src/<stem>/index.<ext>`, `<stem>.<ext>` and `<stem>/index.<ext>`, keeping
+any monorepo prefix. It also handles:
+
+- **Output in the package root** (date-fns: `formatRFC7231.cjs` ← `src/formatRFC7231/index.ts`).
+  Here a `src/` source is required, so a stray root file can't be "explained" by a same-named
+  file next to it.
+- **Bundles:** a file named after the package or a bundle name (`index`, `main`, `bundle`,
+  `cdn`, `umd`, `browser`, `standalone`) maps to the entry file (`rxjs.umd.min.js` ←
+  `src/index.ts`). `<pkg>-<entry>` bundles map to that entry
+  (`react-jsx-runtime.production.min.js` ← `jsx-runtime.js`), and a folder bundle maps to that
+  folder's index (`locale/af/cdn.js` ← `src/locale/af/index.ts`).
+
+These rules were added by testing on real packages. A sweep of 15 popular packages went from
+6 to 10 CLEAN, and `rxjs` + `date-fns` went from 6,322 unexplained files to 0.
 
 **Trade-off:** path conventions are fast and explainable but not proof. A file that maps to a
 source is still scanned for code its source lacks (see below), so an attacker can't hide
@@ -200,17 +214,26 @@ behind a plausible `dist/` name.
 ## `rules/obfuscation.py`: text heuristics
 
 - `Signal(kind, name, line, detail)`, with `.evidence()` giving `"line 12: eval() call: …"`.
-- `obfuscation_signals`: Shannon entropy > **5.2** bits/char (normal JS is about 4.5–5.0;
-  packed or encrypted text is higher), lines over **1000** chars (except sourcemap and JSON
-  data), hex or base64 runs over **200** chars, dense `\x..` / `\u00..` escapes, and
-  `String.fromCharCode` with 8 or more arguments. `minified_ok=True` skips entropy and long
-  lines, because ordinary minified build output trips them.
+- `obfuscation_signals`: Shannon entropy > **5.2** bits/char over the file's **ASCII**
+  characters (normal JS is about 4.5–5.0; packed or encrypted text is higher, while
+  non-English text such as locale files is naturally high and is therefore excluded), lines
+  over **1000** chars (except sourcemap and JSON data), hex or base64 runs over **200** chars,
+  dense `\x..` / `\u00..` escapes that hide **printable ASCII** (`\x63\x68` = "ch"; bundlers
+  legitimately write `á` as `á`, so those don't count), and `String.fromCharCode` with 8
+  or more arguments. `minified_ok=True` skips entropy and long lines, because ordinary
+  minified build output trips them.
 - `dangerous_signals`: per-line regexes for `eval(`, `new Function(`, `child_process`,
   `exec(` / `execSync(` / `execFile(` (but **not** `regex.exec(`, which is everywhere),
   `spawn(`, `net` / `dgram` / `dns` modules, requests to raw IPs (127.x and 0.0.0.0
   excluded), `process.env` combined with token, key, secret, npm or AWS names, or dumped
   wholesale, `~/.npmrc` / `~/.ssh` / `~/.aws` / `id_rsa`, and curl / wget / powershell inside
   string literals.
+- **Performance:** each pattern has keywords it can't match without (`_KEYWORDS`, e.g.
+  `"eval"`), and a regex runs only on files that contain its keyword. A profile of `date-fns`
+  (5,326 files) showed 4.5 million regex searches taking ~75% of analysis time. The keyword
+  gate cut analysis from 1.72 s to 0.77 s with byte-identical findings. One combined
+  alternation regex was tried first and was *slower*, because it defeats the regex engine's
+  literal search.
 - `new_dangerous_signals(package_text, source_text)`: the key comparison. It counts each API
   in the source and reports only the **extra** occurrences in the package. A library that
   legitimately uses `spawn` is fine; a release that adds a second `eval` is not.
