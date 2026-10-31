@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      # Make sure nothing in CI can reach an LLM server: the product must work without one.
+      INTANALYZE_LLM_URL: http://127.0.0.1:9/v1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest --cov=intanalyze --cov-report=term-missing
+
+      # The fixtures arrive in the diff/rules PR; until then these steps are skipped.
+      - name: Smoke test (malicious fixture must exit 1)
+        if: hashFiles('tests/fixtures/malicious/package.tgz') != ''
+        run: |
+          set +e
+          intanalyze check \
+            --tarball tests/fixtures/malicious/package.tgz \
+            --source tests/fixtures/malicious/source \
+            --registry-json tests/fixtures/malicious/registry.json \
+            --no-llm --format json --out malicious.json
+          code=$?
+          set -e
+          echo "exit code: $code"
+          test "$code" -eq 1
+          python -c "import json; r = json.load(open('malicious.json')); print(r['status'], r['score']); assert r['status'] == 'DANGEROUS'"
+
+      - name: Smoke test (clean fixture must exit 0)
+        if: hashFiles('tests/fixtures/clean/package.tgz') != ''
+        run: |
+          intanalyze check \
+            --tarball tests/fixtures/clean/package.tgz \
+            --source tests/fixtures/clean/source \
+            --registry-json tests/fixtures/clean/registry.json \
+            --no-llm --format json --out clean.json
+          python -c "import json; r = json.load(open('clean.json')); print(r['status'], r['score']); assert r['status'] == 'CLEAN'"
