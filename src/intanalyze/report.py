@@ -23,6 +23,7 @@ COUNT_LABELS = {
     "build_output": "build output mapped to a source file",
     "docs": "docs differing only in case/whitespace",
     "manifest": "package.json matching the source",
+    "subpath_stub": "subpath package.json stubs (import redirects)",
     "only_in_source": "only in the source (tests, configs, not published)",
 }
 

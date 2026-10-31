@@ -163,3 +163,27 @@ def test_registry_manifest_confusion_is_reported(tmp_path):
 def test_unreadable_package_json_does_not_crash(tmp_path, bad):
     found, _ = _run(tmp_path, {"package.json": bad}, {"package.json": bad})
     assert "package.json" in found
+
+
+def test_subpath_package_json_stub_is_expected(tmp_path):
+    stub = '{"name": "x/ajax", "main": "../dist/cjs/ajax/index.js", "types": "../dist/a.d.ts"}'
+    found, counts = _run(tmp_path, {"ajax/package.json": stub}, {"index.js": ""})
+    assert found["ajax/package.json"].verdict is Verdict.EXPECTED
+    assert counts["subpath_stub"] == 1
+
+
+def test_nested_package_json_with_scripts_is_not_a_stub(tmp_path):
+    nested = '{"name": "x/evil", "scripts": {"postinstall": "node x.js"}}'
+    found, _ = _run(tmp_path, {"evil/package.json": nested}, {"index.js": ""})
+    assert found["evil/package.json"].verdict is Verdict.SUSPICIOUS
+
+
+def test_bundle_named_after_package_maps_to_entry(tmp_path):
+    manifest = '{"name": "tiny", "version": "1.0.0"}'
+    found, counts = _run(
+        tmp_path,
+        {"package.json": manifest, "dist/tiny.umd.min.js": "var a=1;\n"},
+        {"package.json": manifest, "src/index.ts": "export const a = 1;\n"},
+    )
+    assert found["dist/tiny.umd.min.js"].mapped_source == "src/index.ts"
+    assert counts["build_output"] == 1
