@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IntAnalyze: {{ r.package.name }}@{{ r.package.version }}</title>
+<style>
+  :root { --fg:#1d232b; --muted:#5b6673; --bg:#ffffff; --card:#f5f7f9; --line:#dfe3e8;
+          --red:#b42318; --yellow:#946200; --green:#1a7f37; --cyan:#0e6f85; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg:#e6e9ec; --muted:#9aa4af; --bg:#14181d; --card:#1d232b; --line:#2e3640;
+            --red:#ff7b72; --yellow:#e3b341; --green:#56d364; --cyan:#58c4dc; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg);
+         font:15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 28px 0 10px; border-bottom: 1px solid var(--line);
+       padding-bottom: 4px; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+              font-size: .86em; }
+  pre { background: var(--card); border: 1px solid var(--line); padding: 10px;
+        overflow-x: auto; border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
+           vertical-align: top; overflow-wrap: anywhere; }
+  .meta td:first-child { color: var(--muted); width: 120px; }
+  .badge { display:inline-block; padding: 1px 8px; border-radius: 999px; font-weight: 600;
+           font-size: .82em; border: 1px solid currentColor; }
+  .CLEAN, .EXPECTED { color: var(--green); } .REVIEW, .CHANGED, .MEDIUM { color: var(--yellow); }
+  .DANGEROUS, .SUSPICIOUS, .HIGH { color: var(--red); } .LOW { color: var(--cyan); }
+  .INFO { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+          padding: 12px 14px; margin: 12px 0; }
+  .card h3 { margin: 0 0 6px; font-size: 1rem; overflow-wrap: anywhere; }
+  .muted { color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>IntAnalyze report: {{ r.package.name }}@{{ r.package.version }}</h1>
+  <p><span class="badge {{ r.status }}">{{ r.status }}</span>
+     <span class="muted">risk score {{ r.score }}/100</span></p>
+
+  <table class="meta">
+    <tr><td>Package</td><td><code>{{ r.package.name }}</code></td></tr>
+    <tr><td>Version</td><td><code>{{ r.package.version }}</code></td></tr>
+    <tr><td>Source</td><td>{{ source }}</td></tr>
+    <tr><td>Integrity</td><td>{{ integrity }}</td></tr>
+    <tr><td>Files</td><td>{{ r.files_in_package }} in package, {{ r.files_in_source }} in source</td></tr>
+    <tr><td>LLM</td><td>{{ llm }}</td></tr>
+    <tr><td>Tool</td><td>intanalyze {{ r.tool_version }}</td></tr>
+  </table>
+
+  <h2>Summary</h2>
+  <p>{{ r.summary or "No summary." }}</p>
+
+  <h2>Findings</h2>
+  {% if flagged %}
+  <div class="table-wrap">
+  <table>
+    <tr><th>Path</th><th>Verdict</th><th>Severity</th><th>Rules</th><th>Reason</th></tr>
+    {% for f in flagged %}
+    <tr>
+      <td><code>{{ f.path }}</code></td>
+      <td class="{{ f.verdict }}">{{ f.verdict }}</td>
+      <td class="{{ f.severity }}">{{ f.severity }}</td>
+      <td>{{ f.rule_ids | join(", ") }}</td>
+      <td>{{ f.reason }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}
+  <p class="EXPECTED">No CHANGED or SUSPICIOUS files.</p>
+  {% endif %}
+
+  <h2>Expected differences</h2>
+  <ul>
+    {% for line in counts %}<li>{{ line }}</li>{% else %}<li>none</li>{% endfor %}
+  </ul>
+  {% if mappings %}
+  <details><summary>Build output mapped to source ({{ mappings | length }})</summary>
+    <ul>{% for f in mappings %}<li><code>{{ f.path }}</code> ← <code>{{ f.mapped_source }}</code></li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+
+  {% if flagged %}
+  <h2>Details</h2>
+  {% for f in flagged %}
+  <div class="card">
+    <h3><code>{{ f.path }}</code> <span class="badge {{ f.verdict }}">{{ f.verdict }}</span>
+        <span class="badge {{ f.severity }}">{{ f.severity }}</span></h3>
+    {% if f.explanation %}
+    <p>{{ f.explanation.summary }}</p>
+    <p><strong>Why it matters:</strong> {{ f.explanation.why_it_matters }}</p>
+    <p><strong>Recommended action:</strong> {{ f.explanation.recommended_action }}</p>
+    {% endif %}
+    <p class="muted">Explained by {{ "the LLM" if f.explanation_source == "llm" else "rule text" }}.
+       Rules: {{ f.rule_ids | join(", ") }}.</p>
+    <strong>Evidence</strong>
+    <ul>{% for e in f.evidence %}<li><code>{{ e }}</code></li>{% endfor %}</ul>
+    {% if f.diff %}
+    <details><summary>Diff (source → package)</summary><pre>{{ f.diff }}</pre></details>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if used_rules %}
+  <h2>Rules triggered</h2>
+  <ul>{% for rule in used_rules %}<li><strong>{{ rule }}</strong>: {{ rules[rule] }}</li>{% endfor %}</ul>
+  {% endif %}
+</main>
+</body>
+</html>

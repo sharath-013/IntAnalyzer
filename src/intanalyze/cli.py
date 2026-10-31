@@ -16,6 +16,7 @@ from intanalyze import __version__
 from intanalyze.llm import LLMError, LLMUnavailable, LMStudioClient, explain_report, llm_model
 from intanalyze.models import PackageSpec, Report, Verdict
 from intanalyze.pipeline import CheckError, check_offline, check_online
+from intanalyze.report import render, render_terminal
 from intanalyze.score import exit_code
 
 app = typer.Typer(
@@ -35,6 +36,8 @@ make_llm_client = LMStudioClient
 
 class Format(StrEnum):
     terminal = "terminal"
+    md = "md"
+    html = "html"
     json = "json"
 
 
@@ -49,20 +52,6 @@ class FailOn(StrEnum):
 def version() -> None:
     """Print the IntAnalyze version."""
     typer.echo(f"intanalyze {__version__}")
-
-
-def _render_terminal(report: Report, console: Console) -> None:
-    console.print(
-        f"[bold]IntAnalyze[/] {report.package}  source: {report.source.repo_url} "
-        f"@ {report.source.ref}  status: [bold]{report.status}[/] score: {report.score}"
-    )
-    table = Table("path", "verdict", "severity", "rules", "reason")
-    for f in report.findings:
-        if f.verdict is Verdict.EXPECTED:
-            continue
-        table.add_row(f.path, f.verdict, f.severity, ", ".join(f.rule_ids), f.reason)
-    console.print(table)
-    console.print(f"expected: {report.expected_counts}")
 
 
 def _explain(report: Report, *, no_llm: bool, model: str | None) -> None:
@@ -190,16 +179,17 @@ def check(
 
     _explain(report, no_llm=no_llm, model=model)
 
-    if fmt is Format.json:
-        text = report.model_dump_json(indent=2)
-        if out_path:
-            out_path.write_text(text + "\n", encoding="utf-8")
-        else:
-            typer.echo(text)
-    else:
-        _render_terminal(report, out)
-        if out_path:
-            out_path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    if fmt is Format.terminal:
+        render_terminal(report, out)
+    if out_path:
+        try:
+            out_path.write_text(render(report, fmt.value), encoding="utf-8")
+        except OSError as exc:
+            err.print(f"[red]error:[/] could not write {out_path}: {exc}")
+            raise typer.Exit(EXIT_ERROR) from None
+        err.print(f"report written to {out_path}")
+    elif fmt is not Format.terminal:
+        typer.echo(render(report, fmt.value), nl=False)
 
     raise typer.Exit(exit_code(report.findings, fail_on.value))
 

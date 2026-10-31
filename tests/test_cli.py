@@ -62,10 +62,26 @@ def test_fail_on(fail_on, code):
     assert runner.invoke(app, _offline_args("malicious", "--fail-on", fail_on)).exit_code == code
 
 
-def test_terminal_with_out_writes_json(tmp_path):
-    out = tmp_path / "r.json"
-    runner.invoke(app, _offline_args("clean", "--out", str(out)))
-    assert json.loads(out.read_text())["status"] == "CLEAN"
+@pytest.mark.parametrize(
+    ("fmt", "marker"),
+    [("terminal", "IntAnalyze"), ("md", "# IntAnalyze report"), ("html", "<!doctype html>")],
+)
+def test_out_writes_the_chosen_format(tmp_path, fmt, marker):
+    out = tmp_path / "report"
+    result = runner.invoke(app, _offline_args("malicious", "--format", fmt, "--out", str(out)))
+    assert result.exit_code == 1
+    assert marker in out.read_text()
+
+
+def test_md_to_stdout():
+    result = runner.invoke(app, _offline_args("clean", "--format", "md"))
+    assert result.output.startswith("# IntAnalyze report")
+
+
+def test_unwritable_out_exits_2(tmp_path):
+    out = tmp_path / "missing-dir" / "r.md"
+    result = runner.invoke(app, _offline_args("clean", "--format", "md", "--out", str(out)))
+    assert result.exit_code == 2
 
 
 @pytest.mark.parametrize(
