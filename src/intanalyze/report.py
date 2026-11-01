@@ -24,6 +24,7 @@ COUNT_LABELS = {
     "docs": "docs differing only in case/whitespace",
     "manifest": "package.json matching the source",
     "subpath_stub": "subpath package.json stubs (import redirects)",
+    "entry_shim": "build-time entry switches (NODE_ENV) loading published build files",
     "only_in_source": "only in the source (tests, configs, not published)",
 }
 

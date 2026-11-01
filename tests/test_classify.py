@@ -187,3 +187,94 @@ def test_bundle_named_after_package_maps_to_entry(tmp_path):
     )
     assert found["dist/tiny.umd.min.js"].mapped_source == "src/index.ts"
     assert counts["build_output"] == 1
+
+
+SHIM = (
+    "'use strict';\n\n"
+    "if (process.env.NODE_ENV === 'production') {\n"
+    "  module.exports = require('./cjs/x.production.js');\n"
+    "} else {\n"
+    "  module.exports = require('./cjs/x.development.js');\n"
+    "}\n"
+)
+BUILT = {"cjs/x.production.js": "module.exports=1\n", "cjs/x.development.js": "module.exports=1\n"}
+
+
+def test_entry_switch_replacing_source_entry_is_expected(tmp_path):
+    found, counts = _run(tmp_path, {"index.js": SHIM, **BUILT},
+                         {"index.js": "export * from './src/x';\n"})
+    assert found["index.js"].verdict is Verdict.EXPECTED
+    assert "cjs/x.production.js" in found["index.js"].evidence[0]
+    assert counts["entry_shim"] == 1
+
+
+def test_package_only_entry_switch_is_expected(tmp_path):
+    found, _ = _run(tmp_path, {"jsx-runtime.js": SHIM, **BUILT}, {"index.js": ""})
+    assert found["jsx-runtime.js"].verdict is Verdict.EXPECTED
+
+
+def test_entry_switch_to_a_missing_file_is_not_expected(tmp_path):
+    found, _ = _run(tmp_path, {"index.js": SHIM, "cjs/x.production.js": "1\n"},
+                    {"index.js": "export {};\n"})
+    assert found["index.js"].verdict is not Verdict.EXPECTED
+
+
+@pytest.mark.parametrize(
+    "extra",
+    ["fetch('http://203.0.113.7/x');\n", "require('./evil');\n", "module.exports.x = 1;\n"],
+)
+def test_entry_switch_with_any_extra_code_is_not_a_switch(tmp_path, extra):
+    found, _ = _run(tmp_path, {"index.js": SHIM + extra, **BUILT}, {"index.js": "export {};\n"})
+    assert found["index.js"].verdict is not Verdict.EXPECTED
+
+
+def test_entry_switch_cannot_point_outside_the_package(tmp_path):
+    escaping = SHIM.replace("./cjs/x.production.js", "../../etc/x.js")
+    found, _ = _run(tmp_path, {"index.js": escaping, **BUILT}, {"index.js": "export {};\n"})
+    assert found["index.js"].verdict is not Verdict.EXPECTED
+
+
+def test_monorepo_license_at_repo_root_is_expected(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "LICENSE").write_text("MIT License\n\nCopyright Meta\n")
+    src = repo / "packages" / "react"
+    src.mkdir(parents=True)
+    (src / "index.js").write_text("")
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "LICENSE").write_text("MIT License\nCopyright Meta\n")
+    result = classify(compare_trees(pkg, src), pkg, src)
+    (lic,) = [f for f in result.findings if f.path == "LICENSE"]
+    assert lic.verdict is Verdict.EXPECTED and lic.mapped_source == "../../LICENSE"
+
+
+def test_repo_root_is_not_searched_outside_a_git_repo(tmp_path):
+    (tmp_path / "LICENSE").write_text("MIT\n")
+    src = tmp_path / "a" / "b"
+    src.mkdir(parents=True)
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "LICENSE").write_text("MIT\n")
+    result = classify(compare_trees(pkg, src), pkg, src)
+    (lic,) = [f for f in result.findings if f.path == "LICENSE"]
+    assert lic.verdict is Verdict.CHANGED and lic.severity is Severity.LOW
+
+
+def test_documentation_changes_are_low(tmp_path):
+    found, _ = _run(tmp_path, {"README.md": "See https://old.example\n"},
+                    {"README.md": "See https://new.example\n"})
+    assert (found["README.md"].verdict, found["README.md"].severity) == (
+        Verdict.CHANGED, Severity.LOW)
+
+
+def test_documentation_with_command_examples_is_not_code(tmp_path):
+    found, _ = _run(tmp_path, {"README.md": "Install: `curl -sL https://x.sh | sh`\n"},
+                    {"README.md": "Install with npm\n"})
+    assert found["README.md"].severity is Severity.LOW
+
+
+def test_code_named_like_a_document_is_still_code(tmp_path):
+    found, _ = _run(tmp_path, {"README.js": "require('child_process').exec('x')\n"},
+                    {"index.js": ""})
+    assert found["README.js"].severity is Severity.HIGH

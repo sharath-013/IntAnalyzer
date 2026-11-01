@@ -272,12 +272,15 @@ interesting file and a `Counter` of expected files:
 |---|---|
 | IDENTICAL | counted as `identical` |
 | ONLY_IN_SOURCE (tests, configs) | counted as `only_in_source` |
-| Package-only doc (README/LICENSE/CHANGELOG…) matching a source doc ignoring case/whitespace | EXPECTED, counted as `docs` |
+| Package-only doc (README/LICENSE/CHANGELOG…) matching a source doc ignoring case/whitespace, in its folder or (monorepos) at the repository root | EXPECTED, counted as `docs` |
+| Package-only doc with no match | CHANGED/LOW IA-FILE-001 (documents never run) |
 | Package-only build output mapped to a source file | EXPECTED/INFO with `mapped_source`, unless it has blobs/escapes or dangerous APIs its source doesn't, then **SUSPICIOUS/HIGH IA-CODE-001** |
 | Package-only, unmapped, with obfuscation or dangerous APIs | **SUSPICIOUS/HIGH IA-CODE-001** |
 | Package-only, unmapped, otherwise (incl. binaries, files over 20 MB) | SUSPICIOUS/MEDIUM IA-FILE-001 |
 | MODIFIED, package version adds dangerous APIs | **SUSPICIOUS/HIGH IA-CODE-002** (with diff) |
 | MODIFIED committed build output that was rebuilt | EXPECTED |
+| Entry file replaced by a build-time `NODE_ENV` switch whose every `require` is a file in the package (react, react-dom, scheduler) | EXPECTED, counted as `entry_shim` |
+| MODIFIED documentation | CHANGED/LOW IA-FILE-002 |
 | MODIFIED, only removes lines | CHANGED/LOW IA-FILE-002 |
 | MODIFIED, otherwise | CHANGED/MEDIUM IA-FILE-002 (with diff) |
 | `package.json` | all manifest issues merged into one finding: worst severity, SUSPICIOUS if any issue is |

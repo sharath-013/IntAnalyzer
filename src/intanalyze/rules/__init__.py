@@ -18,6 +18,8 @@ RULES: dict[str, str] = {
     "or dangerous APIs that its source does not.",
     "IA-CODE-002": "File present in both trees, where the package version adds dangerous APIs "
     "absent from the source version.",
-    "IA-FILE-001": "File found nowhere in the repository and not explained as build output.",
-    "IA-FILE-002": "File present in both trees with different content.",
+    "IA-FILE-001": "File found nowhere in the repository and not explained as build output "
+    "(LOW for documentation files, which are never executed).",
+    "IA-FILE-002": "File present in both trees with different content (LOW for documentation "
+    "or when lines are only removed).",
 }
