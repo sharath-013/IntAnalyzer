@@ -2,6 +2,8 @@
 
 **The code on GitHub isn't always the code you install. IntAnalyze tells you the difference.**
 
+**Website:** https://sharath-013.github.io/IntAnalyzer/ (home page plus real IntAnalyze reports, rebuilt by GitHub Actions on every merge to `main`).
+
 IntAnalyze ("Int" for *integrity*) compares a **published npm package** (e.g. `ms@2.1.3`) with
 its **source repository** at the matching commit or tag, explains **every** difference, and
 alerts on suspicious releases:
