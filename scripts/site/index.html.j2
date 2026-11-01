@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IntAnalyze</title>
+<meta name="description" content="IntAnalyze checks whether a published npm package matches its GitHub source, explains every difference, and flags suspicious releases.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --bg: #f5f7fa; --surface: #ffffff; --ink: #17202b; --muted: #4a5666; --line: #dde2e9;
+    --accent: #b45309; --accent-soft: #fdf1e1; --code: #eef1f5;
+    --ok: #1b7a44; --ok-soft: #e3f3e9; --warn: #9a6400; --warn-soft: #fbf0d9;
+    --bad: #b42318; --bad-soft: #fbe8e6;
+    --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121a24; --surface: #1b2531; --ink: #eef2f6; --muted: #a7b3c2; --line: #2c3a4a;
+      --accent: #f0a145; --accent-soft: #33261a; --code: #1f2833;
+      --ok: #5fcf8c; --ok-soft: #173326; --warn: #e8b04a; --warn-soft: #33291a;
+      --bad: #ff8a7f; --bad-soft: #3a1f1d; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--sans); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left)); }
+  header.hero { background: #121a24; color: #eef2f6; padding: 72px 0 64px; }
+  header.hero .eyebrow { color: #f0a145; }
+  header.hero p.lead { color: #c9d3de; }
+  .eyebrow { font: 600 13px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+  h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.02; margin: 0 0 18px; letter-spacing: -0.02em; }
+  h2 { font-size: 30px; line-height: 1.2; margin: 0 0 14px; text-wrap: balance; }
+  h3 { font-size: 19px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  p.lead { font-size: 21px; max-width: 46ch; }
+  .accent { color: #f0a145; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+  .btn { display: inline-block; padding: 11px 18px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+  .btn.primary { background: #f0a145; color: #17202b; }
+  .btn.ghost { border: 1px solid #3a4a5c; color: #eef2f6; }
+  .btn:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  section { padding: 56px 0; border-bottom: 1px solid var(--line); }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: .88em; background: var(--code); padding: .1em .35em; border-radius: 4px; }
+  pre { font: 14px/1.55 var(--mono); background: var(--code); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 0 0 12px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+  .card.ai { background: var(--accent-soft); border: 1px dashed var(--accent); }
+  .num { font: 600 13px var(--mono); color: var(--accent); }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td.num-col { font-variant-numeric: tabular-nums; text-align: right; }
+  .chip { display: inline-block; font: 600 12px/1 var(--mono); padding: 4px 7px; border-radius: 4px; white-space: nowrap; }
+  .CLEAN, .EXPECTED { color: var(--ok); background: var(--ok-soft); }
+  .REVIEW, .CHANGED { color: var(--warn); background: var(--warn-soft); }
+  .DANGEROUS, .SUSPICIOUS { color: var(--bad); background: var(--bad-soft); }
+  ul { padding-left: 20px; margin: 0 0 12px; }
+  li { margin: 4px 0; }
+  footer { padding: 32px 0 48px; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Hacktoberfest Hack Day Sonipat · TEAM MLS</p>
+    <h1>IntAnalyze</h1>
+    <p class="lead">The code on GitHub isn’t always the code you install. <span class="accent">IntAnalyze tells you the difference.</span></p>
+    <div class="buttons">
+      <a class="btn primary" href="#reports">See real reports</a>
+      <a class="btn ghost" href="{{ repo }}">Code on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="wrap">
+    <p class="eyebrow">The problem</p>
+    <h2>You review one thing and install another</h2>
+    <p class="muted" style="max-width:68ch">When you run <code>npm install</code>, you get a tarball uploaded by whoever holds the publish token, not the GitHub code people review. The xz-utils backdoor (2024) and the Shai-Hulud npm worm (2025) both lived only in what was published. IntAnalyze downloads the published package and the source at the exact release commit, compares every file, and gives each one a verdict with evidence.</p>
+    <div class="scroll" style="margin-top:20px">
+      <table>
+        <tr><th>File in the package</th><th>Verdict</th><th>Why</th></tr>
+        <tr><td><code>dist/index.js</code></td><td><span class="chip EXPECTED">EXPECTED</span></td><td>Compiled from <code>src/index.ts</code></td></tr>
+        <tr><td><code>package.json</code></td><td><span class="chip SUSPICIOUS">SUSPICIOUS</span></td><td>New <code>postinstall</code> script not in the source</td></tr>
+        <tr><td><code>lib/x.min.js</code></td><td><span class="chip SUSPICIOUS">SUSPICIOUS</span></td><td>Obfuscated file found nowhere in the repo</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Seven steps, and the AI never decides</h2>
+    <div class="grid">
+      <div class="card"><p class="num">1–2</p><h3>Resolve and fetch</h3><p class="muted">npm metadata, sha512 check, shallow clone at the release commit.</p></div>
+      <div class="card"><p class="num">3–4</p><h3>Extract and diff</h3><p class="muted">Hardened extraction, then SHA-256 for every file.</p></div>
+      <div class="card"><p class="num">5</p><h3>Classify</h3><p class="muted">11 deterministic rules give each file a verdict and evidence.</p></div>
+      <div class="card ai"><p class="num">6</p><h3>Explain</h3><p class="muted">Qwen3.5 9B, running locally, writes plain English. Optional.</p></div>
+      <div class="card"><p class="num">7</p><h3>Report</h3><p class="muted">Score 0–100, report, and exit code 0 / 1 / 2 for CI.</p></div>
+    </div>
+    <p class="muted" style="margin-top:16px">Package code is never executed: no install, no scripts, no import or eval.</p>
+  </div>
+</section>
+
+<section id="reports">
+  <div class="wrap">
+    <p class="eyebrow">Reports from real runs</p>
+    <h2>Open a report</h2>
+    <p class="muted">Each link is a full HTML report produced by IntAnalyze itself.</p>
+
+    <h3 style="margin-top:24px">Examples, explained by the local model</h3>
+    <p class="muted">Committed runs from a team laptop with LM Studio serving Qwen3.5 9B.</p>
+    <div class="scroll">
+      <table>
+        <tr><th>Example</th><th>Package</th><th>Status</th><th>Score</th><th>Flagged</th><th>Explained by</th></tr>
+        {% for r in examples %}
+        <tr><td><a href="{{ r.href }}">{{ r.label }}</a></td><td><code>{{ r.package }}</code></td><td><span class="chip {{ r.status }}">{{ r.status }}</span></td><td class="num-col">{{ r.score }}</td><td class="num-col">{{ r.flagged }}</td><td>{{ r.llm }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <h3 style="margin-top:32px">Live checks of real npm packages</h3>
+    {% if live_enabled %}
+    <p class="muted">Re-run against the npm registry and GitHub every time this site is built ({{ built }}). Rules only: the build server has no local model.</p>
+    {% if live %}
+    <div class="scroll">
+      <table>
+        <tr><th>Package</th><th>Status</th><th>Score</th><th>Files</th><th>Flagged</th></tr>
+        {% for r in live %}
+        <tr><td><a href="{{ r.href }}"><code>{{ r.package }}</code></a></td><td><span class="chip {{ r.status }}">{{ r.status }}</span></td><td class="num-col">{{ r.score }}</td><td class="num-col">{{ r.files }}</td><td class="num-col">{{ r.flagged }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {% for e in live_errors %}<p class="muted">Skipped {{ e }}</p>{% endfor %}
+    {% else %}
+    <p class="muted">Live checks were not run for this build.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Try it</p>
+    <h2>Install and run</h2>
+    <pre>git clone {{ repo }}.git
+cd IntAnalyzer
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -e .
+intanalyze check ms@2.1.3 --no-llm</pre>
+    <p class="muted">Optional AI explanations: install LM Studio, run <code>lms server start</code> and <code>lms load qwen/qwen3.5-9b</code>, then <code>intanalyze doctor</code>. Details and every rule are in the <a href="{{ repo }}#readme">README</a> and the <a href="{{ repo }}/blob/main/docs/WALKTHROUGH.md">code walkthrough</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow">Limitations</p>
+    <h2>What it can’t do yet</h2>
+    <ul class="muted">
+      <li>Checks npm packages only, and needs a source repo it can clone over HTTPS.</li>
+      <li>Detection is pattern-based, so clever obfuscation can slip past.</li>
+      <li>Build output is matched by file paths, not rebuilt, so heavily bundled packages (for example react-dom) still need a human review.</li>
+      <li>This page is static: live checks run when the site is built, not on demand.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>TEAM MLS: Maryada Sharath Chandra Reddy · Sugunesh Dande · Adem Aravind · BBSVS Praveen</p>
+    <p>MIT licence · intanalyze {{ version }}{% if commit %} · built from <a href="{{ repo }}/commit/{{ commit }}">{{ commit }}</a>{% endif %} · Model used by the product: Qwen3.5 9B (open weights) via LM Studio · Code written with Claude Code</p>
+  </div>
+</footer>
+</body>
+</html>
