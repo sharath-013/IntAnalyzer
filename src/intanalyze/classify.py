@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import posixpath
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -33,8 +34,69 @@ class ClassifyResult:
     expected_counts: Counter[str] = field(default_factory=Counter)
 
 
+# A "README.js" is code, not a document: only these endings count as documentation.
+_DOC_EXTS = frozenset({"", ".md", ".markdown", ".txt", ".rst", ".adoc"})
+
+
 def _is_doc(path: str) -> bool:
-    return bool(_DOC_RE.match(path.rsplit("/", 1)[-1]))
+    name = path.rsplit("/", 1)[-1]
+    ext = name[name.index("."):].lower() if "." in name else ""
+    return bool(_DOC_RE.match(name)) and ext in _DOC_EXTS
+
+
+# The standard build-time entry switch (react, react-dom, scheduler, ...):
+#   'use strict';
+#   if (process.env.NODE_ENV === 'production') { module.exports = require('./cjs/x.prod.js'); }
+#   else { module.exports = require('./cjs/x.dev.js'); }
+# Every token below is allowed; anything left over means it is not just a switch.
+_SHIM_TOKENS = re.compile(
+    r"""\s+|/\*.*?\*/|//[^\n]*|['"]use strict['"];?"""
+    r"""|if\s*\(\s*process\.env\.NODE_ENV\s*[!=]==?\s*['"][\w-]+['"]\s*\)\s*\{?"""
+    r"""|\}?\s*else\s*\{?|\}"""
+    r"""|module\.exports\s*=\s*require\(\s*['"](\.{1,2}/[^'"]+)['"]\s*\)\s*;?""",
+    re.DOTALL,
+)
+
+
+def _entry_shim_targets(path: str, text: str, pkg: Path) -> list[str] | None:
+    """Files an environment entry switch loads, if ``text`` is only such a switch and every
+    file it loads exists inside the package; else None."""
+    targets: list[str] = []
+    pos = 0
+    for m in _SHIM_TOKENS.finditer(text):
+        if m.start() != pos:
+            return None
+        if m.group(1):
+            targets.append(m.group(1))
+        pos = m.end()
+    if pos != len(text) or not targets:
+        return None
+    folder = posixpath.dirname(path)
+    found = []
+    for target in targets:
+        rel = posixpath.normpath(posixpath.join(folder, target))
+        if rel.startswith("../") or rel == "..":
+            return None
+        for cand in (rel, rel + ".js", rel + "/index.js"):
+            if cand.endswith((".js", ".cjs", ".mjs")) and (pkg / cand).is_file():
+                found.append(cand)
+                break
+        else:
+            return None
+    return found
+
+
+def _repo_roots(src: Path, max_up: int = 4) -> list[Path]:
+    """Folders above a monorepo package's source dir, up to the clone's root (the folder
+    holding .git); empty when no .git is close above, so nothing outside a repo is read."""
+    chain = []
+    cur = src.resolve()
+    for _ in range(max_up):
+        cur = cur.parent
+        chain.append(cur)
+        if (cur / ".git").exists():
+            return chain
+    return []
 
 
 def _loose(text: str | None) -> str | None:
@@ -105,6 +167,14 @@ def _doc_matches_source(fd: FileDiff, pkg: Path, src: Path, src_files: set[str])
         if c_folder == folder and c_name.lower() == name.lower():
             if _loose(read_text(src / cand)) == pkg_text:
                 return cand
+    if folder:
+        return None
+    # Monorepos keep LICENSE/README at the repository root; npm copies them into the package.
+    for up, root in enumerate(_repo_roots(src), start=1):
+        for entry in sorted(root.iterdir()):
+            if entry.name.lower() == name.lower() and entry.is_file() and not entry.is_symlink():
+                if _loose(read_text(entry)) == pkg_text:
+                    return "../" * up + entry.name
     return None
 
 
@@ -154,6 +224,17 @@ def _classify_package_only(
             False,
         )
 
+    if _is_doc(fd.path) and not fd.is_binary:
+        # Documentation is never executed, so a missing or different copy is low risk.
+        return (
+            _finding(
+                fd, Verdict.CHANGED, Severity.LOW, ["IA-FILE-001"],
+                "document not found in the repo",
+                [f"{fd.size} bytes; documentation files are never executed"],
+            ),
+            True,
+        )
+
     if _is_subpath_stub(fd, pkg):
         counts["subpath_stub"] += 1
         return (
@@ -190,6 +271,18 @@ def _classify_package_only(
                 fd, Verdict.EXPECTED, Severity.INFO, [],
                 f"compiled output of {mapped}",
                 [f"maps to source {mapped}"], mapped_source=mapped,
+            ),
+            False,
+        )
+
+    shim = text is not None and is_code(fd.path) and _entry_shim_targets(fd.path, text, pkg)
+    if shim:
+        counts["entry_shim"] += 1
+        return (
+            _finding(
+                fd, Verdict.EXPECTED, Severity.INFO, [],
+                "build-time entry switch that loads published build files",
+                ["loads " + ", ".join(shim) + " depending on NODE_ENV"],
             ),
             False,
         )
@@ -243,11 +336,18 @@ def _classify_modified(
     pkg_text = read_text(pkg / fd.path) or ""
     src_text = read_text(src / fd.path)
 
-    if _is_doc(fd.path) and _loose(pkg_text) == _loose(src_text):
-        counts["docs"] += 1
+    if _is_doc(fd.path):
+        if _loose(pkg_text) == _loose(src_text):
+            counts["docs"] += 1
+            return _finding(
+                fd, Verdict.EXPECTED, Severity.INFO, [],
+                "only case/whitespace differences", ["case/whitespace-only change"],
+            )
+        # Documentation is never executed: report the change, at low severity.
         return _finding(
-            fd, Verdict.EXPECTED, Severity.INFO, [],
-            "only case/whitespace differences", ["case/whitespace-only change"],
+            fd, Verdict.CHANGED, Severity.LOW, ["IA-FILE-002"],
+            "documentation differs from the source",
+            [f"+{fd.lines_added} / -{fd.lines_removed} lines"], diff=fd.diff,
         )
 
     added = new_dangerous_signals(pkg_text, src_text)
@@ -267,6 +367,14 @@ def _classify_modified(
         return _finding(
             fd, Verdict.EXPECTED, Severity.INFO, [],
             f"rebuilt output of {mapped}", [f"maps to source {mapped}"], mapped_source=mapped,
+        )
+    shim = is_code(fd.path) and _entry_shim_targets(fd.path, pkg_text, pkg)
+    if shim:
+        counts["entry_shim"] += 1
+        return _finding(
+            fd, Verdict.EXPECTED, Severity.INFO, [],
+            "source entry replaced by a build-time switch that loads published build files",
+            ["loads " + ", ".join(shim) + " depending on NODE_ENV"], diff=fd.diff,
         )
     plus, minus = fd.lines_added, fd.lines_removed
     note = " (diff truncated)" if fd.diff_truncated else ""

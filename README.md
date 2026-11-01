@@ -162,8 +162,8 @@ See [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) for a module-by-module explanat
 | `IA-MANIFEST-006` | SUSPICIOUS / HIGH | Registry metadata disagrees with the tarball's `package.json` on install scripts or dependencies ("manifest confusion"). |
 | `IA-CODE-001` | SUSPICIOUS / HIGH | A package-only file (or build output) contains obfuscation or dangerous APIs that its source does not. |
 | `IA-CODE-002` | SUSPICIOUS / HIGH | A file present in both trees where the package version adds dangerous APIs absent from the source version. |
-| `IA-FILE-001` | SUSPICIOUS / MEDIUM | File found nowhere in the repository and not explained as build output. |
-| `IA-FILE-002` | CHANGED / MEDIUM (LOW if it only removes lines) | File present in both trees with different content; the diff is in the report. |
+| `IA-FILE-001` | SUSPICIOUS / MEDIUM (CHANGED / LOW for documentation) | File found nowhere in the repository and not explained as build output. |
+| `IA-FILE-002` | CHANGED / MEDIUM (LOW for documentation, or if it only removes lines) | File present in both trees with different content; the diff is in the report. |
 
 **Obfuscation signals:** Shannon entropy > 5.2 bits/char, lines > 1000 characters (not
 sourcemaps or JSON), hex/base64 blobs > 200 characters, dense `\x..` escapes,
